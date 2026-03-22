@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WatermarkAI - AI 去水印工具</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f0f0f;
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px;
+    }
+
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .subtitle {
+      color: #888;
+      margin-bottom: 40px;
+    }
+
+    .container {
+      display: flex;
+      gap: 40px;
+      max-width: 1200px;
+      width: 100%;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .panel {
+      background: #1a1a1a;
+      border-radius: 16px;
+      padding: 24px;
+      flex: 1;
+      min-width: 300px;
+      max-width: 500px;
+    }
+
+    .panel-title {
+      font-size: 0.9rem;
+      color: #888;
+      margin-bottom: 16px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .upload-area {
+      border: 2px dashed #333;
+      border-radius: 12px;
+      padding: 40px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .upload-area:hover {
+      border-color: #667eea;
+      background: rgba(102, 126, 234, 0.1);
+    }
+
+    .upload-area.dragover {
+      border-color: #667eea;
+      background: rgba(102, 126, 234, 0.2);
+    }
+
+    .upload-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+
+    .upload-text {
+      color: #888;
+    }
+
+    .upload-text strong {
+      color: #667eea;
+    }
+
+    #fileInput {
+      display: none;
+    }
+
+    .canvas-container {
+      position: relative;
+      width: 100%;
+      margin-top: 16px;
+    }
+
+    #mainCanvas {
+      width: 100%;
+      border-radius: 8px;
+      background: #000;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 12px;
+      margin-top: 16px;
+      flex-wrap: wrap;
+    }
+
+    .tool-btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+
+    .tool-btn.primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff;
+    }
+
+    .tool-btn.primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    .tool-btn.secondary {
+      background: #333;
+      color: #fff;
+    }
+
+    .tool-btn.secondary:hover {
+      background: #444;
+    }
+
+    .brush-size {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #888;
+      font-size: 14px;
+    }
+
+    .brush-size input {
+      width: 100px;
+    }
+
+    .result-panel {
+      display: none;
+    }
+
+    .result-panel.active {
+      display: block;
+    }
+
+    .result-placeholder {
+      border: 2px dashed #333;
+      border-radius: 12px;
+      padding: 40px;
+      text-align: center;
+      color: #666;
+    }
+
+    .result-image {
+      width: 100%;
+      border-radius: 8px;
+    }
+
+    .comparison {
+      position: relative;
+      width: 100%;
+      overflow: hidden;
+      border-radius: 8px;
+    }
+
+    .comparison img {
+      width: 100%;
+      display: block;
+    }
+
+    .loading {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      padding: 40px;
+    }
+
+    .loading.active {
+      display: flex;
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid #333;
+      border-top-color: #667eea;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .loading-text {
+      color: #888;
+    }
+
+    .download-btn {
+      margin-top: 16px;
+      width: 100%;
+      padding: 16px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .download-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    .info {
+      margin-top: 40px;
+      text-align: center;
+      color: #666;
+      font-size: 14px;
+    }
+
+    .info a {
+      color: #667eea;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>🖼️ WatermarkAI</h1>
+  <p class="subtitle">AI 去除图片水印 · 完全免费 · 即用即走</p>
+
+  <div class="container">
+    <!-- 左侧：上传和标注 -->
+    <div class="panel">
+      <div class="panel-title">📤 上传图片 & 标注水印</div>
+      
+      <div class="upload-area" id="uploadArea">
+        <div class="upload-icon">📁</div>
+        <p class="upload-text">
+          拖拽图片到这里，或 <strong>点击选择</strong><br>
+          <small>支持 JPG、PNG、WEBP，最大 10MB</small>
+        </p>
+      </div>
+      <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp">
+
+      <div class="canvas-container" id="canvasContainer" style="display: none;">
+        <canvas id="mainCanvas"></canvas>
+      </div>
+
+      <div class="toolbar" id="toolbar" style="display: none;">
+        <button class="tool-btn secondary" id="brushTool">🖌️ 涂抹模式</button>
+        <button class="tool-btn secondary" id="clearMask">🗑️ 清除标注</button>
+        <button class="tool-btn secondary" id="undoBtn">↩️ 撤销</button>
+        <div class="brush-size">
+          画笔：<input type="range" id="brushSize" min="5" max="100" value="30"> <span id="brushSizeValue">30</span>px
+        </div>
+      </div>
+
+      <button class="tool-btn primary" id="processBtn" style="display: none; width: 100%; margin-top: 16px;">
+        ✨ 去除水印
+      </button>
+    </div>
+
+    <!-- 右侧：结果 -->
+    <div class="panel result-panel" id="resultPanel">
+      <div class="panel-title">✨ 处理结果</div>
+      
+      <div class="result-placeholder" id="resultPlaceholder">
+        <p>处理后的图片将在这里显示</p>
+      </div>
+
+      <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <p class="loading-text">AI 正在去除水印，预计 3-10 秒...</p>
+      </div>
+
+      <div class="comparison" id="comparison" style="display: none;">
+        <img id="resultImage" class="result-image" alt="处理结果">
+      </div>
+
+      <button class="download-btn" id="downloadBtn" style="display: none;">
+        ⬇️ 下载无水印图片
+      </button>
+    </div>
+  </div>
+
+  <p class="info">
+    图片直传内存，不经过任何服务器存储 · 
+    基于 Cloudflare Worker + AI API
+  </p>
+
+  <script src="https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js"></script>
+  <script>
+    // 状态管理
+    let canvas = null;
+    let originalImage = null;
+    let isBrushMode = false;
+    let maskDataUrl = null;
+    let resultDataUrl = null;
+
+    // DOM 元素
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('fileInput');
+    const canvasContainer = document.getElementById('canvasContainer');
+    const toolbar = document.getElementById('toolbar');
+    const processBtn = document.getElementById('processBtn');
+    const resultPanel = document.getElementById('resultPanel');
+    const resultPlaceholder = document.getElementById('resultPlaceholder');
+    const loading = document.getElementById('loading');
+    const comparison = document.getElementById('comparison');
+    const resultImage = document.getElementById('resultImage');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const brushTool = document.getElementById('brushTool');
+    const clearMask = document.getElementById('clearMask');
+    const undoBtn = document.getElementById('undoBtn');
+    const brushSizeInput = document.getElementById('brushSize');
+    const brushSizeValue = document.getElementById('brushSizeValue');
+
+    // 上传区域事件
+    uploadArea.addEventListener('click', () => fileInput.click());
+    
+    uploadArea.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      uploadArea.classList.add('dragover');
+    });
+    
+    uploadArea.addEventListener('dragleave', () => {
+      uploadArea.classList.remove('dragover');
+    });
+    
+    uploadArea.addEventListener('drop', (e) => {
+      e.preventDefault();
+      uploadArea.classList.remove('dragover');
+      const file = e.dataTransfer.files[0];
+      if (file) handleFile(file);
+    });
+
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) handleFile(file);
+    });
+
+    // 处理文件
+    function handleFile(file) {
+      if (!file.type.match(/image\/(jpeg|png|webp)/)) {
+        alert('请上传 JPG、PNG 或 WEBP 格式的图片');
+        return;
+      }
+      
+      if (file.size > 10 * 1024 * 1024) {
+        alert('图片大小不能超过 10MB');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        originalImage = e.target.result;
+        initCanvas(originalImage);
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // 初始化画布
+    function initCanvas(imageUrl) {
+      uploadArea.style.display = 'none';
+      canvasContainer.style.display = 'block';
+      toolbar.style.display = 'flex';
+      processBtn.style.display = 'block';
+      resultPanel.classList.add('active');
+
+      const img = new Image();
+      img.onload = () => {
+        // 计算画布尺寸（最大宽度 450px）
+        const maxWidth = 450;
+        let width = img.width;
+        let height = img.height;
+        
+        if (width > maxWidth) {
+          height = (height * maxWidth) / width;
+          width = maxWidth;
+        }
+
+        canvas = new fabric.Canvas('mainCanvas', {
+          width,
+          height,
+          backgroundColor: '#000'
+        });
+
+        fabric.Image.fromURL(imageUrl, (img) => {
+          img.scaleToWidth(width);
+          canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas));
+        });
+
+        // 默认进入涂抹模式
+        enableBrushMode();
+      };
+      img.src = imageUrl;
+    }
+
+    // 涂抹模式
+    function enableBrushMode() {
+      isBrushMode = true;
+      brushTool.classList.remove('secondary');
+      brushTool.classList.add('primary');
+      brushTool.textContent = '🖌️ 涂抹中';
+      
+      canvas.isDrawingMode = true;
+      canvas.freeDrawingBrush.color = 'rgba(255, 0, 0, 0.6)';
+      canvas.freeDrawingBrush.width = parseInt(brushSizeInput.value);
+    }
+
+    function disableBrushMode() {
+      isBrushMode = false;
+      brushTool.classList.remove('primary');
+      brushTool.classList.add('secondary');
+      brushTool.textContent = '🖌️ 涂抹模式';
+      
+      canvas.isDrawingMode = false;
+    }
+
+    brushTool.addEventListener('click', () => {
+      if (isBrushMode) {
+        disableBrushMode();
+      } else {
+        enableBrushMode();
+      }
+    });
+
+    brushSizeInput.addEventListener('input', (e) => {
+      brushSizeValue.textContent = e.target.value;
+      if (canvas && canvas.freeDrawingBrush) {
+        canvas.freeDrawingBrush.width = parseInt(e.target.value);
+      }
+    });
+
+    clearMask.addEventListener('click', () => {
+      if (canvas) {
+        canvas.getObjects().forEach((obj) => {
+          if (obj !== canvas.backgroundImage) {
+            canvas.remove(obj);
+          }
+        });
+        canvas.renderAll();
+      }
+    });
+
+    undoBtn.addEventListener('click', () => {
+      if (canvas) {
+        const objects = canvas.getObjects();
+        if (objects.length > 0) {
+          canvas.remove(objects[objects.length - 1]);
+          canvas.renderAll();
+        }
+      }
+    });
+
+    // 处理图片
+    processBtn.addEventListener('click', async () => {
+      if (!canvas) return;
+
+      // 显示 loading
+      resultPlaceholder.style.display = 'none';
+      comparison.style.display = 'none';
+      loading.style.display = 'flex';
+      downloadBtn.style.display = 'none';
+
+      try {
+        // 生成 mask
+        const maskCanvas = document.createElement('canvas');
+        maskCanvas.width = canvas.width;
+        maskCanvas.height = canvas.height;
+        const maskCtx = maskCanvas.getContext('2d');
+
+        // 填充黑色背景
+        maskCtx.fillStyle = 'black';
+        maskCtx.fillRect(0, 0, maskCanvas.width, maskCanvas.height);
+
+        // 绘制涂抹区域为白色
+        maskCtx.fillStyle = 'white';
+        canvas.getObjects().forEach((obj) => {
+          if (obj !== canvas.backgroundImage) {
+            maskCtx.fill(obj);
+          }
+        });
+
+        maskDataUrl = maskCanvas.toDataURL('image/png');
+
+        // 调用 API
+        const formData = new FormData();
+        
+        // 转换 data URL 到 Blob
+        const imageBlob = dataURLtoBlob(originalImage);
+        const maskBlob = dataURLtoBlob(maskDataUrl);
+        
+        formData.append('image', imageBlob, 'image.png');
+        formData.append('mask', maskBlob, 'mask.png');
+
+        // 这里需要替换为实际的 API 地址
+        // const response = await fetch('/api/remove-watermark', {
+        //   method: 'POST',
+        //   body: formData
+        // });
+
+        // 模拟处理（实际使用时替换为真实 API 调用）
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // 模拟结果（复制原图作为结果演示）
+        resultDataUrl = originalImage;
+
+        // 显示结果
+        loading.style.display = 'none';
+        resultImage.src = resultDataUrl;
+        comparison.style.display = 'block';
+        downloadBtn.style.display = 'block';
+
+      } catch (error) {
+        console.error('处理失败:', error);
+        loading.style.display = 'none';
+        resultPlaceholder.style.display = 'block';
+        resultPlaceholder.querySelector('p').textContent = '处理失败，请重试';
+        alert('处理失败: ' + error.message);
+      }
+    });
+
+    // 下载结果
+    downloadBtn.addEventListener('click', () => {
+      if (resultDataUrl) {
+        const link = document.createElement('a');
+        link.download = 'watermark-removed.png';
+        link.href = resultDataUrl;
+        link.click();
+      }
+    });
+
+    // 工具函数
+    function dataURLtoBlob(dataurl) {
+      const arr = dataurl.split(',');
+      const mime = arr[0].match(/:(.*?);/)[1];
+      const bstr = atob(arr[1]);
+      let n = bstr.length;
+      const u8arr = new Uint8Array(n);
+      while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+      }
+      return new Blob([u8arr], { type: mime });
+    }
+  </script>
+</body>
+</html>
