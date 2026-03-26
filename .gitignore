@@ -1,0 +1,16 @@
+# 本地环境变量
+.dev.vars
+
+# wrangler 输出
+.wrangler/
+dist/
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo

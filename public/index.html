@@ -520,17 +520,29 @@
         formData.append('image', imageBlob, 'image.png');
         formData.append('mask', maskBlob, 'mask.png');
 
-        // 这里需要替换为实际的 API 地址
-        // const response = await fetch('/api/remove-watermark', {
-        //   method: 'POST',
-        //   body: formData
-        // });
-
-        // 模拟处理（实际使用时替换为真实 API 调用）
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // 本地开发环境：调用 wrangler dev 服务器
+        // 生产环境：调用 Worker 部署地址
+        const API_BASE = window.location.hostname === 'localhost' 
+          ? 'http://localhost:8787' 
+          : '';
         
-        // 模拟结果（复制原图作为结果演示）
-        resultDataUrl = originalImage;
+        const response = await fetch(`${API_BASE}/api/remove-watermark`, {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!response.ok) {
+          throw new Error('API 请求失败: ' + response.status);
+        }
+
+        const result = await response.json();
+        
+        if (!result.success) {
+          throw new Error(result.error || '处理失败');
+        }
+
+        // 获取结果图片
+        resultDataUrl = result.result_url;
 
         // 显示结果
         loading.style.display = 'none';

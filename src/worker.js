@@ -10,6 +10,8 @@ const SILICONFLOW_IMAGES_EDITS_URL = 'https://api.siliconflow.cn/v1/images/edits
 
 export default {
   async fetch(request, env, ctx) {
+    const url = new URL(request.url);
+
     // CORS 预检
     if (request.method === 'OPTIONS') {
       return new Response(null, {
@@ -21,10 +23,16 @@ export default {
       });
     }
 
-    if (request.method !== 'POST') {
-      return new Response('Method not allowed', { status: 405 });
+    // 处理 API 路由
+    if (url.pathname === '/api/remove-watermark' && request.method === 'POST') {
+      return this.handleRemoveWatermark(request, env);
     }
 
+    // 其他路由返回 404
+    return new Response('Not Found', { status: 404 });
+  }
+
+  async handleRemoveWatermark(request, env) {
     try {
       const formData = await request.formData();
       const image = formData.get('image');
