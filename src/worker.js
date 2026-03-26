@@ -2,11 +2,11 @@
  * Image Watermark Remover - Cloudflare Worker
  * 
  * 接收图片和mask，调用 SiliconFlow API 进行去水印处理
+ * API: POST /v1/images/edits (MiniMax Image-01 模型)
  */
 
-// SiliconFlow API 配置
-const SILICONFLOW_API_URL = 'https://api.siliconflow.cn/v1/chat/completions';
-const API_KEY = ''; // 从环境变量读取
+// SiliconFlow Images Edits API
+const SILICONFLOW_IMAGES_EDITS_URL = 'https://api.siliconflow.cn/v1/images/edits';
 
 export default {
   async fetch(request, env, ctx) {
@@ -29,54 +29,33 @@ export default {
       const formData = await request.formData();
       const image = formData.get('image');
       const mask = formData.get('mask');
+      const prompt = formData.get('prompt') || '去除图片中的水印或不需要的内容，保持图片自然';
 
       if (!image || !mask) {
         return jsonResponse({ success: false, error: 'MISSING_IMAGE_OR_MASK' }, 400);
       }
 
-      // 转换图片为 base64
-      const imageBuffer = await image.arrayBuffer();
-      const imageBase64 = arrayBufferToBase64(imageBuffer);
-      const imageDataUrl = `data:${image.type};base64,${imageBase64}`;
-
-      // 转换 mask 为 base64
-      const maskBuffer = await mask.arrayBuffer();
-      const maskBase64 = arrayBufferToBase64(maskBuffer);
-      const maskDataUrl = `data:${mask.type};base64,${maskBase64}`;
-
-      // 调用 SiliconFlow API
-      const apiKey = env.SILICONFLOW_API_KEY || API_KEY;
+      // 获取 API Key
+      const apiKey = env.SILICONFLOW_API_KEY;
       if (!apiKey) {
         return jsonResponse({ success: false, error: 'API_KEY_NOT_SET' }, 500);
       }
 
       const startTime = Date.now();
-      
-      const response = await fetch(SILICONFLOW_API_URL, {
+
+      // 构建 multipart/form-data 请求
+      const apiFormData = new FormData();
+      apiFormData.append('model', 'Minimax/Image-01');
+      apiFormData.append('image', image, 'image.png');
+      apiFormData.append('mask', mask, 'mask.png');
+      apiFormData.append('prompt', prompt);
+
+      const response = await fetch(SILICONFLOW_IMAGES_EDITS_URL, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          model: 'Qwen/Qwen2.5-VL-72B-Instruct',
-          messages: [
-            {
-              role: 'user',
-              content: [
-                {
-                  type: 'text',
-                  text: '你是一个图像修复专家。请去除图片中的水印，只返回处理后的图片。'
-                },
-                {
-                  type: 'image_url',
-                  image_url: { url: imageDataUrl }
-                }
-              ]
-            }
-          ],
-          stream: false
-        }),
+        body: apiFormData,
       });
 
       if (!response.ok) {
@@ -92,21 +71,33 @@ export default {
       const result = await response.json();
       const processingTime = Date.now() - startTime;
 
-      // 解析返回的图片
+      // 解析返回结果
+      // MiniMax/SiliconFlow 图片编辑API返回格式: { task_id, status, ... }
+      // 异步模式需要轮询，这里尝试解析同步返回或异步任务
       let resultImage = null;
-      if (result.choices && result.choices[0] && result.choices[0].message) {
-        const content = result.choices[0].message.content;
-        // 尝试提取 base64 图片
-        const base64Match = content.match(/data:image\/\w+;base64,[A-Za-z0-9+/=]+/);
-        if (base64Match) {
-          resultImage = base64Match[0];
-        }
+
+      if (result.data && result.data[0] && result.data[0].url) {
+        // 同步返回图片URL
+        resultImage = result.data[0].url;
+      } else if (result.data && result.data[0] && result.data[0].b64_json) {
+        // base64 格式
+        resultImage = `data:image/png;base64,${result.data[0].b64_json}`;
+      } else if (result.task_id) {
+        // 异步任务，返回task_id供前端轮询
+        return jsonResponse({
+          success: true,
+          task_id: result.task_id,
+          async_mode: true,
+          processing_time_ms: processingTime
+        });
       }
 
       if (!resultImage) {
+        console.error('Unexpected API response:', JSON.stringify(result));
         return jsonResponse({ 
           success: false, 
-          error: 'NO_IMAGE_IN_RESPONSE' 
+          error: 'NO_IMAGE_IN_RESPONSE',
+          debug: result 
         }, 500);
       }
 
@@ -137,11 +128,4 @@ function jsonResponse(data, status = 200) {
   });
 }
 
-function arrayBufferToBase64(buffer) {
-  const bytes = new Uint8Array(buffer);
-  let binary = '';
-  for (let i = 0; i < bytes.byteLength; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary);
-}
+

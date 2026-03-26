@@ -1,6 +1,6 @@
 # 🚧 开发进度记录
 
-> 最后更新：2026-03-22
+> 最后更新：2026-03-26
 
 ## 当前状态
 
@@ -8,7 +8,7 @@
 |-----|------|-----|
 | GitHub 仓库 | ✅ 已创建 | https://github.com/zjfcyefeng-arch/image-watermark-remover |
 | 前端页面 | ✅ 已完成 | `/public/index.html` |
-| Worker 后端 | ⚠️ 待部署 | `/src/worker.js` 代码已写，需 Cloudflare Token |
+| Worker 后端 | ✅ 已修复 | `/src/worker.js` 已更新为 Minimax/Image-01 + /v1/images/edits |
 | API Key | ✅ 已获取 | 硅基流动 API Key 已保存（需安全存储） |
 
 ---
@@ -28,17 +28,33 @@ image-watermark-remover/
 
 ---
 
+## 🔧 已修复问题 (2026-03-26)
+
+### ❌ 旧版问题
+- 模型用错：`Qwen/Qwen2.5-VL-72B-Instruct` 是视觉理解模型，不适合 inpainting
+- API 端点用错：用了 `/v1/chat/completions` 而非图片编辑端点
+- 没有传 mask：无法指定要去除水印的区域
+
+### ✅ 新版修复
+- **模型**: `Minimax/Image-01`
+- **API 端点**: `POST /v1/images/edits`
+- **请求格式**: `multipart/form-data` (image + mask + prompt)
+- **功能**: 传入原图和 Mask 图，让模型去掉 Mask 区域的内容（正是去水印！）
+
+---
+
 ## 🔧 待完成任务
 
 ### 高优先级
-- [ ] 获取 Cloudflare API Token
+- [ ] 获取 Cloudflare API Token（部署必需品）
 - [ ] 部署 Worker 到 Cloudflare：`wrangler deploy`
 - [ ] 配置 `SILICONFLOW_API_KEY` 密钥
+- [ ] 完整流程测试：上传 → 标注 → 处理 → 下载
 
 ### 中优先级
-- [ ] 对接 SiliconFlow 实际 API（当前 Worker 代码需要根据实际 API 调整）
-- [ ] 测试完整流程：上传 → 标注 → 处理 → 下载
+- [ ] 确认 Minimax/Image-01 的 /v1/images/edits 实际响应格式
 - [ ] 添加错误处理和 Loading 状态
+- [ ] 若 API 为异步模式（返回 task_id），需前端轮询逻辑
 
 ### 低优先级
 - [ ] 添加对比滑块效果
@@ -65,7 +81,7 @@ wrangler secret put SILICONFLOW_API_KEY
 ## 🛠 继续开发命令
 
 ```bash
-# 1. 克隆仓库
+# 1. 克隆仓库（如果还没克隆）
 git clone https://github.com/zjfcyefeng-arch/image-watermark-remover.git
 cd image-watermark-remover
 
@@ -80,7 +96,7 @@ wrangler deploy
 
 # 5. 配置 API Key
 wrangler secret put SILICONFLOW_API_KEY
-# 输入: sk-ywvocwvvjufznvlyzedjmcuurfeddcbaialmdxxuudrboxnj
+# 输入你的 SiliconFlow API Key
 
 # 6. 本地开发
 wrangler dev
@@ -88,14 +104,16 @@ wrangler dev
 
 ---
 
-## 📝 SiliconFlow API 信息
+## 📝 SiliconFlow + MiniMax API 信息
 
 | 项目 | 内容 |
-|-----|-----|
+|-----|------|
 | API 地址 | https://api.siliconflow.cn |
-| 模型 | LaMa Cleaner（待确认） |
-| 免费额度 | 500次/天 |
-| 文档 | https://docs.siliconflow.cn |
+| 端点 | POST /v1/images/edits |
+| 模型 | Minimax/Image-01 |
+| 请求格式 | multipart/form-data (image, mask, prompt) |
+| 免费额度 | 需确认（SiliconFlow 平台） |
+| 文档 | https://platform.minimaxi.com/docs/guides/image-generation |
 
 ---
 
@@ -103,6 +121,7 @@ wrangler dev
 
 - GitHub 仓库：https://github.com/zjfcyefeng-arch/image-watermark-remover
 - 硅基流动：https://siliconflow.cn
+- MiniMax 开放平台：https://platform.minimaxi.com/
 - Cloudflare Workers：https://developers.cloudflare.com/workers/
 - Fabric.js 文档：https://fabricjs.com/
 
